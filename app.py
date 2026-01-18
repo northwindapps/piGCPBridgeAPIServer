@@ -73,9 +73,10 @@ def is_document_present(image_path):
             # 凸包チェック（凹んでいる四角形を除外）
             if cv2.isContourConvex(approx):
                 print(f"Document detected! Area: {area}")
-                return True
+                return True, area
+        return False, area
                 
-    return False
+    return False, 0
 
 @app.route('/ocr', methods=['POST'])
 def process_ocr():
@@ -84,6 +85,8 @@ def process_ocr():
         return jsonify({"status": "error", "message": "No image part"}), 400
     
     file = request.files['imagefile']
+
+    distance_m = request.form.get('distance')
     
     if file.filename == '':
         return jsonify({"status": "error", "message": "No selected file"}), 400
@@ -112,7 +115,9 @@ def process_ocr():
         os.remove(filepath)
         return jsonify({"status": "error", "message": "Image too blurry"}), 400
     
-    if is_document_present(filepath) == False:
+    is_detected, detected_area = is_document_present(filepath)
+
+    if not is_detected:
         os.remove(filepath)
         return jsonify({"status": "error", "message": "Document is not presented"}), 400
 
@@ -145,6 +150,16 @@ def process_ocr():
 
         # 成功した場合の処理
         print(f"OCR Success (Conf: {avg_conf:.1f}%): {full_text[:50]}...")
+
+        mock_result = {
+            "status": "success",
+            "saved_path": filepath,
+            "detected_text": full_text[:50], # 将来のOCR結果
+            "detected_area": detected_area,
+            "distance_m": distance_m
+        }
+
+        return jsonify(mock_result), 200
         # TODO Third Party OCR API
         
     except Exception as e:
@@ -152,13 +167,7 @@ def process_ocr():
         return jsonify({"status": "error", "message": str(e)}), 500
 
     # 3. モックのレスポンス（後にGCP Vision APIをここに統合）
-    mock_result = {
-        "status": "success",
-        "saved_path": filepath,
-        "detected_text": "Hello World 2026", # 将来のOCR結果
-    }
-
-    return jsonify(mock_result), 200
+    
 
 if __name__ == '__main__':
     app.run(host='0.0.0.0', port=5001, debug=True)
