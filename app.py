@@ -107,7 +107,7 @@ def process_ocr():
     print(f"Blur Score: {blur_score:.2f}")
 
     # Threshold varies by lighting, but 100 is a good starting point
-    if blur_score < 40:
+    if blur_score < 60:
         print("❌ Image too blurry. Deleting...")
         os.remove(filepath)
         return jsonify({"status": "error", "message": "Image too blurry"}), 400
