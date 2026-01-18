@@ -1,5 +1,6 @@
 from datetime import datetime
 import os
+import cv2
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 
@@ -12,6 +13,21 @@ if not os.path.exists(UPLOAD_FOLDER):
 
 app.config['UPLOAD_FOLDER'] = UPLOAD_FOLDER
 
+def get_blur_score(image_path):
+    """
+    Returns the variance of the Laplacian. 
+    High score = Sharp (Edges are clear)
+    Low score = Blurry (Edges are smoothed out)
+    """
+    img = cv2.imread(image_path)
+    if img is None:
+        return 0
+    
+    gray = cv2.cvtColor(img, cv2.COLOR_BGR2GRAY)
+    # Variance of the Laplacian is the industry standard for blur detection
+    score = cv2.Laplacian(gray, cv2.CV_64F).var()
+    return score
+
 @app.route('/ocr', methods=['POST'])
 def process_ocr():
     # 1. ファイルがリクエストに含まれているかチェック
@@ -22,6 +38,7 @@ def process_ocr():
     
     if file.filename == '':
         return jsonify({"status": "error", "message": "No selected file"}), 400
+            
 
     # --- 修正ポイント：ファイル名にタイムスタンプを付与 ---
     # 1. 元のファイル名から拡張子を取得 (例: .jpg)
@@ -35,6 +52,16 @@ def process_ocr():
     filepath = os.path.join(app.config['UPLOAD_FOLDER'], new_filename)
     
     file.save(filepath)
+
+    # 1. Blur Check
+    blur_score = get_blur_score(filepath)
+    print(f"Blur Score: {blur_score:.2f}")
+
+    # Threshold varies by lighting, but 100 is a good starting point
+    if blur_score < 40:
+        print("❌ Image too blurry. Deleting...")
+        os.remove(filepath)
+        return jsonify({"status": "error", "message": "No selected file"}), 400
 
     print(f"Saved image to: {filepath}")
 
