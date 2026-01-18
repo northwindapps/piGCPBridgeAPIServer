@@ -61,7 +61,7 @@ def process_ocr():
     if blur_score < 40:
         print("❌ Image too blurry. Deleting...")
         os.remove(filepath)
-        return jsonify({"status": "error", "message": "No selected file"}), 400
+        return jsonify({"status": "error", "message": "Image too blurry"}), 400
 
     print(f"Saved image to: {filepath}")
 
