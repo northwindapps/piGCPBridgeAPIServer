@@ -1,11 +1,13 @@
 from datetime import datetime
 import os
+import io
 import cv2
 from flask import Flask, request, jsonify
 from werkzeug.utils import secure_filename
 import pytesseract
 from PIL import Image
 import numpy as np
+from google.cloud import vision
 
 app = Flask(__name__)
 
@@ -151,15 +153,38 @@ def process_ocr():
         # 成功した場合の処理
         print(f"OCR Success (Conf: {avg_conf:.1f}%): {full_text[:50]}...")
 
-        mock_result = {
+        client = vision.ImageAnnotatorClient.from_service_account_json('gcp.json')
+        
+
+        img_byte_arr = io.BytesIO()
+        img.save(img_byte_arr, format='JPEG') # Save to memory buffer
+        content = img_byte_arr.getvalue() 
+
+        # 2. Vision API 形式に変換
+        image = vision.Image(content=content)
+
+        # 3. テキスト検出を実行
+        # document_text_detection は段落やブロック構造の認識に優れています
+        response = client.document_text_detection(image=image)
+
+        # エラーチェック
+        if response.error.message:
+            return jsonify({"error": response.error.message}), 500
+
+        # 4. 結果の抽出
+        # texts[0].description には画像内の全テキストが含まれます
+        texts = response.text_annotations
+        extracted_text = texts[0].description if texts else "テキストは見つかりませんでした"
+
+        result = {
             "status": "success",
             "saved_path": filepath,
-            "detected_text": full_text[:50], # 将来のOCR結果
+            "detected_text": extracted_text, #full_text[:50], # 将来のOCR結果
             "detected_area": detected_area,
             "distance_m": distance_m
         }
 
-        return jsonify(mock_result), 200
+        return jsonify(result), 200
         # TODO Third Party OCR API
         
     except Exception as e:
