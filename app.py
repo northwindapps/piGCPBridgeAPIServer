@@ -65,17 +65,32 @@ def is_document_present(image_path):
         # - 頂点が4つ（四角形）
         # - 面積が画像全体の20%以上（小さすぎるノイズを除外）
         area = cv2.contourArea(c)
+        max_area = 0.0
+        max_approx = None
+        h_img,w_img = img.shape[:2]
         print("apporx",len(approx))
         print("area",area)
         print("imagearea",image_area * 0.02)
+        print("width",w_img)
+        print("height",h_img)
         # if len(approx) == 4 and area > (image_area * 0.2):
         hull = cv2.convexHull(c)
         approx = cv2.approxPolyDP(hull, 0.02 * cv2.arcLength(hull, True), True)
         if cv2.contourArea(hull) > image_area * 0.02:
-            # 凸包チェック（凹んでいる四角形を除外）
-            if cv2.isContourConvex(approx):
-                print(f"Document detected! Area: {area}")
-                return True, area
+            if max_area < area:
+                max_area = area
+                max_approx = approx
+        
+        if max_area != 0.0 and cv2.isContourConvex(max_approx):
+                x,y,w,h = cv2.boundingRect(max_approx)
+                min_x,max_x = x,x+w
+                min_y,max_y = y,y+h
+
+                
+                # Don't want the one with the page overflows out of the frame
+                if max_x < w_img - 5  and max_y < h_img - 5 and min_x > 5 and min_y > 5:
+                    print(f"Document detected! Area: {area} max_x: {max_x} max_y: {max_y}")
+                    return True, area
         return False, area
                 
     return False, 0
